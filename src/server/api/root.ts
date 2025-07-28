@@ -1,4 +1,4 @@
-import { postRouter } from "~/server/api/routers/post";
+import { streakRouter } from "~/server/api/routers/streak";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -7,7 +7,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
+  streak: streakRouter,
 });
 
 // export type definition of API

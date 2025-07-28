@@ -2,19 +2,33 @@ import { relations, sql } from "drizzle-orm";
 import { index, pgTableCreator, primaryKey } from "drizzle-orm/pg-core";
 import { type AdapterAccount } from "next-auth/adapters";
 
+const projectPrefix = "streak-trackr_";
+
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
  * database instance for multiple projects.
  *
  * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
  */
-export const createTable = pgTableCreator((name) => `streak-trackr_${name}`);
+export const createTable = pgTableCreator((name) => `${projectPrefix}${name}`);
 
-export const posts = createTable(
-  "post",
+export const streaks = createTable(
+  "streak",
   (d) => ({
     id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-    name: d.varchar({ length: 256 }),
+    title: d.varchar({ length: 256 }).notNull(),
+    description: d.text(),
+    color: d.varchar({ length: 7 }).default("#000000").notNull(),
+    longestStreak: d.integer().default(0).notNull(),
+    currentStartDate: d
+      .timestamp({ mode: "date", withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    currentEndDate: d
+      .timestamp({ mode: "date", withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    pastStreaks: d.jsonb().default({}).notNull(),
     createdById: d
       .varchar({ length: 255 })
       .notNull()
@@ -26,8 +40,8 @@ export const posts = createTable(
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
   }),
   (t) => [
-    index("created_by_idx").on(t.createdById),
-    index("name_idx").on(t.name),
+    index(`${projectPrefix}streak_createdby_idx`).on(t.createdById),
+    index(`${projectPrefix}streak_title_idx`).on(t.title),
   ],
 );
 
@@ -72,7 +86,7 @@ export const accounts = createTable(
   }),
   (t) => [
     primaryKey({ columns: [t.provider, t.providerAccountId] }),
-    index("account_user_id_idx").on(t.userId),
+    index(`${projectPrefix}account_user_id_idx`).on(t.userId),
   ],
 );
 
@@ -90,7 +104,7 @@ export const sessions = createTable(
       .references(() => users.id),
     expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
   }),
-  (t) => [index("t_user_id_idx").on(t.userId)],
+  (t) => [index(`${projectPrefix}t_user_id_idx`).on(t.userId)],
 );
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
