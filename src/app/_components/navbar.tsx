@@ -13,10 +13,6 @@ import {
 import { ThemeToggle } from "./theme-toggle";
 import Image from "next/image";
 
-// 1. Import necessary hooks
-import { useState, useEffect } from "react";
-import { useTheme } from "next-themes";
-
 export function Navbar({ session }: { session: Session | null }) {
   const navLinks = [
     { href: "/why", label: "Why?" },
@@ -24,15 +20,6 @@ export function Navbar({ session }: { session: Session | null }) {
   ];
 
   const title = "Streak Tracker";
-
-  // 2. Get theme and mounted state
-  const [mounted, setMounted] = useState(false);
-  const { resolvedTheme } = useTheme();
-
-  // useEffect only runs on the client, so we can safely set the mounted state
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   return (
     <header className="bg-background/70 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 flex w-full items-center justify-center self-center px-4 backdrop-blur sm:px-8 md:px-20">
@@ -42,25 +29,20 @@ export function Navbar({ session }: { session: Session | null }) {
           <Link href="/" className="flex items-center space-x-2">
             <div className="flex h-16 w-16 items-center justify-center">
               {/* 3. Conditionally render the logo based on the resolved theme */}
-              {mounted && (
-                <>
-                  {resolvedTheme === "dark" ? (
-                    <Image
-                      src="/logo-dark.webp"
-                      alt="logo"
-                      width={128}
-                      height={128}
-                    />
-                  ) : (
-                    <Image
-                      src="/logo-light.webp"
-                      alt="logo"
-                      width={128}
-                      height={128}
-                    />
-                  )}
-                </>
-              )}
+              <Image
+                src="/logo-light.webp"
+                alt="logo"
+                width={128}
+                height={128}
+                className="block dark:hidden" // Show by default, hide in dark mode
+              />
+              <Image
+                src="/logo-dark.webp"
+                alt="logo"
+                width={128}
+                height={128}
+                className="hidden dark:block" // Hide by default, show in dark mode
+              />
             </div>
             <span className="font-bold max-lg:hidden">{title}</span>
           </Link>
