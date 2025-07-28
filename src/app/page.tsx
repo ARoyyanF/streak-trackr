@@ -44,6 +44,19 @@ export default async function Home() {
       <main>
         <StreakList initialStreaks={initialStreaks} />
       </main>
+      <footer className="bg-background border-t py-8">
+        <div className="text-muted-foreground container mx-auto max-w-5xl px-4 text-center text-sm">
+          <p className="font-semibold">
+            A quick note on keeping your streaks alive:
+          </p>
+          <p className="mt-2">
+            Life&apos;s a marathon, not a sprint! I&apos;ve built in a 3-day
+            cushion, so if you miss a day, your streak is safe. It will only
+            break after three consecutive days of inactivity. Stay consistent,
+            but don&apos;t stress the small bumps!
+          </p>
+        </div>
+      </footer>
     </HydrateClient>
   );
 }
