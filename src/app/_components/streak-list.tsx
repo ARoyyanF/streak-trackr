@@ -62,6 +62,49 @@ import {
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
 
+// Place these helper functions at the top of your file, after the imports.
+
+/**
+ * Calculates the contrasting text color (black or white) for a given hex color.
+ * @param hex - The hex color string (e.g., "#RRGGBB").
+ * @returns "#000000" for light backgrounds, "#FFFFFF" for dark backgrounds.
+ */
+function getContrastingTextColor(hex: string): string {
+  if (!hex) return "#000000";
+  const r = parseInt(hex.substring(1, 3), 16);
+  const g = parseInt(hex.substring(3, 5), 16);
+  const b = parseInt(hex.substring(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? "#000000" : "#FFFFFF";
+}
+
+/**
+ * Lightens or darkens a color by a given amount.
+ * @param hex - The hex color string.
+ * @param amount - The amount to lighten (positive) or darken (negative).
+ * @returns The new hex color string.
+ */
+function adjustColor(hex: string, amount: number): string {
+  const color = hex.startsWith("#") ? hex.substring(1, 7) : hex;
+  const f = parseInt(color, 16);
+  const t = amount < 0 ? 0 : 255;
+  const p = amount < 0 ? amount * -1 : amount;
+  const R = f >> 16;
+  const G = (f >> 8) & 0x00ff;
+  const B = f & 0x0000ff;
+  return (
+    "#" +
+    (
+      0x1000000 +
+      (Math.round((t - R) * (p / 100)) + R) * 0x10000 +
+      (Math.round((t - G) * (p / 100)) + G) * 0x100 +
+      (Math.round((t - B) * (p / 100)) + B)
+    )
+      .toString(16)
+      .slice(1)
+  );
+}
+
 type Streak = RouterOutputs["streak"]["getStreaks"][number];
 
 // Helper to calculate streak length
@@ -141,7 +184,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
+    <div className="container mx-auto p-6 md:p-8">
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-4xl font-bold tracking-tight">Your Streaks</h1>
         <Button onClick={handleAddNewClick}>
@@ -149,7 +192,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
         </Button>
       </header>
 
-      <div className="grid gap-6">
+      <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {streaks?.map((streak) => {
           const currentLength = calculateStreakLength(
             streak.currentStartDate,
@@ -158,91 +201,175 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
           // 6 months is ~182 days
           const progress = Math.min((currentLength / 182) * 100, 100);
 
+          // --- Dynamic Style Calculation ---
+          const baseColor = streak.color;
+          const textColor = getContrastingTextColor(baseColor);
+          const layer1Color = adjustColor(baseColor, -10); // Darker shade for bottom layer
+          const layer2Color = adjustColor(baseColor, 10); // Lighter shade for middle layer
+          const subtleTextColor =
+            textColor === "#FFFFFF"
+              ? "rgba(255,255,255,0.7)"
+              : "rgba(0,0,0,0.6)";
+          const flameColor =
+            textColor === "#FFFFFF"
+              ? "rgba(255,255,255,0.08)"
+              : "rgba(0,0,0,0.05)";
+
           return (
-            <Card key={streak.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle
-                      className="flex items-center gap-2"
-                      style={{ color: streak.color }}
-                    >
-                      <Flame /> {streak.title}
-                    </CardTitle>
-                    <CardDescription>{streak.description}</CardDescription>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleEditClick(streak)}>
-                        <Edit className="mr-2 h-4 w-4" /> Edit
-                      </DropdownMenuItem>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem
-                            onSelect={(e) => e.preventDefault()}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will
-                              permanently delete your streak.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() =>
-                                deleteMutation.mutate({ id: streak.id })
-                              }
+            <Card
+              key={streak.id}
+              className="relative flex transform-gpu flex-col overflow-hidden rounded-2xl border-none shadow-lg transition-transform hover:scale-[1.02]"
+              style={{
+                backgroundColor: layer1Color,
+                backgroundImage: `
+                  radial-gradient(circle at 100% 0%, ${layer2Color} 0%, transparent 40%),
+                  radial-gradient(circle at 0% 100%, ${baseColor} 0%, transparent 40%)
+                `,
+                color: textColor,
+              }}
+            >
+              <Flame
+                size={200}
+                className="absolute -right-12 -bottom-12 z-0"
+                style={{ color: flameColor }}
+              />
+
+              <div className="relative z-10 flex h-full flex-col p-6">
+                <CardHeader className="p-0">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-2xl font-bold">
+                        {streak.title}
+                      </CardTitle>
+                      {streak.description && (
+                        <CardDescription
+                          className="mt-1"
+                          style={{ color: subtleTextColor }}
+                        >
+                          {streak.description}
+                        </CardDescription>
+                      )}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="options-button h-8 w-8 shrink-0 rounded-full"
+                          style={{
+                            color: textColor,
+                            // @ts-expect-error custom property
+                            "--hover-bg": subtleTextColor,
+                          }}
+                        >
+                          <MoreHorizontal className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem
+                          onClick={() => handleEditClick(streak)}
+                        >
+                          <Edit className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
                             >
-                              Continue
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4 flex items-end justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">
-                      Current Streak
-                    </p>
-                    <p className="text-3xl font-bold">{currentLength} days</p>
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will
+                                permanently delete your streak.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() =>
+                                  deleteMutation.mutate({ id: streak.id })
+                                }
+                              >
+                                Continue
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="text-right">
-                    <p className="text-muted-foreground text-sm">
-                      Longest Streak
-                    </p>
-                    <p className="font-semibold">
-                      {currentLength > streak.longestStreak
-                        ? currentLength
-                        : streak.longestStreak}{" "}
-                      days
-                    </p>
+                </CardHeader>
+
+                <CardContent className="flex-grow p-0 pt-6">
+                  <div className="mb-4 flex items-end justify-between">
+                    <div>
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: subtleTextColor }}
+                      >
+                        Current
+                      </p>
+                      <p className="text-5xl leading-none font-bold">
+                        {currentLength}
+                        <span className="text-3xl font-medium">d</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className="text-sm font-medium"
+                        style={{ color: subtleTextColor }}
+                      >
+                        Longest
+                      </p>
+                      <p className="text-xl font-semibold">
+                        {Math.max(currentLength, streak.longestStreak)}d
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <Progress value={progress} className="w-full" />
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() => extendMutation.mutate({ id: streak.id })}
-                >
-                  <Calendar className="mr-2 h-4 w-4" /> Extend Streak for Today
-                </Button>
-              </CardFooter>
+                  <Progress
+                    value={progress}
+                    className="progress-bar h-2 w-full"
+                    style={
+                      // @ts-expect-error custom property
+                      {
+                        "--progress-bg": subtleTextColor,
+                        "--progress-indicator": textColor,
+                      }
+                    }
+                  />
+                  <p
+                    className="mt-3 text-center text-xs"
+                    style={{ color: subtleTextColor }}
+                  >
+                    On a streak since{" "}
+                    {new Date(streak.currentStartDate).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      },
+                    )}
+                  </p>
+                </CardContent>
+
+                <CardFooter className="mt-auto p-0 pt-6">
+                  <Button
+                    className="w-full rounded-lg py-6 text-base font-semibold"
+                    onClick={() => extendMutation.mutate({ id: streak.id })}
+                    style={{
+                      backgroundColor: textColor,
+                      color: baseColor,
+                    }}
+                  >
+                    <Calendar className="mr-2 h-5 w-5" /> Extend Streak
+                  </Button>
+                </CardFooter>
+              </div>
             </Card>
           );
         })}

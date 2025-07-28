@@ -9,6 +9,24 @@
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+/* Add these to your global stylesheet */
+
+/* Custom styles for the Progress component */
+.progress-bar {
+  background-color: var(--progress-bg, #e5e7eb); /* Default track color */
+}
+.progress-bar > div {
+  background-color: var(
+    --progress-indicator,
+    #000000
+  ); /* Default indicator color */
+}
+
+/* Custom hover for the options button */
+.options-button:hover {
+  background-color: var(--hover-bg, #f3f4f6); /* Default hover color */
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

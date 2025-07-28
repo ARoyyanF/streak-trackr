@@ -41,7 +41,9 @@ export default async function Home() {
 
   return (
     <HydrateClient>
-      <StreakList initialStreaks={initialStreaks} />
+      <main>
+        <StreakList initialStreaks={initialStreaks} />
+      </main>
     </HydrateClient>
   );
 }
