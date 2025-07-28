@@ -37,20 +37,32 @@ export const streakRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
-        title: z.string().min(1, "Title is required"),
+        title: z.string().optional(),
         description: z.string().optional(),
         color: z.string().length(7).default("#000000"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await ctx.db.insert(streaks).values({
-        title: input.title,
-        description: input.description,
-        color: input.color,
-        createdById: ctx.session.user.id,
-        currentStartDate: new Date(),
-        currentEndDate: new Date(),
-      });
+      const [streak] = await ctx.db
+        .insert(streaks)
+        .values({
+          title: input.title,
+          description: input.description,
+          color: input.color,
+          createdById: ctx.session.user.id,
+          currentStartDate: new Date(),
+          currentEndDate: new Date(),
+        })
+        .returning();
+
+      if (!streak) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Create: Streak not created.",
+        });
+      }
+
+      return streak;
     }),
 
   delete: protectedProcedure
@@ -69,11 +81,12 @@ export const streakRouter = createTRPCRouter({
       if (!streak) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Streak not found.",
+          message: "Delete: Streak not found.",
         });
       }
 
       await ctx.db.delete(streaks).where(eq(streaks.id, input.id));
+      return streak;
     }),
 
   /**
@@ -83,14 +96,14 @@ export const streakRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.number(),
-        title: z.string().min(1),
+        title: z.string().optional(),
         description: z.string().optional(),
         color: z.string().length(7).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...updateData } = input;
-      await ctx.db
+      const [streak] = await ctx.db
         .update(streaks)
         .set({
           ...updateData,
@@ -98,7 +111,15 @@ export const streakRouter = createTRPCRouter({
         })
         .where(
           and(eq(streaks.id, id), eq(streaks.createdById, ctx.session.user.id)),
-        );
+        )
+        .returning();
+      if (!streak) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Update: Streak not found.",
+        });
+      }
+      return streak;
     }),
 
   /**
@@ -122,7 +143,7 @@ export const streakRouter = createTRPCRouter({
       if (!streak) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Streak not found.",
+          message: "Extend: Streak not found.",
         });
       }
 
@@ -174,5 +195,6 @@ export const streakRouter = createTRPCRouter({
           })
           .where(eq(streaks.id, input.id));
       }
+      return streak;
     }),
 });

@@ -6,6 +6,9 @@ import { type RouterOutputs, api } from "~/trpc/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { toast } from "sonner";
+import Confetti from "react-confetti"; // For animations
+
 import {
   MoreHorizontal,
   Plus,
@@ -13,6 +16,13 @@ import {
   Edit,
   Flame,
   Calendar,
+  CheckCircle,
+  Award, // For badges
+  Star, // For badges
+  Trophy,
+  Crown,
+  Medal,
+  Flag, // For badges
 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -32,7 +42,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "~/components/ui/dialog";
 import {
@@ -61,6 +70,11 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import {
+  TooltipTrigger,
+  TooltipContent,
+  Tooltip,
+} from "~/components/ui/tooltip";
 
 // Place these helper functions at the top of your file, after the imports.
 
@@ -107,6 +121,15 @@ function adjustColor(hex: string, amount: number): string {
 
 type Streak = RouterOutputs["streak"]["getStreaks"][number];
 
+const milestones = [
+  { day: 3, icon: Flag, label: "3-Day" },
+  { day: 7, icon: Star, label: "1-Week" },
+  { day: 30, icon: Award, label: "1-Month" },
+  { day: 100, icon: Trophy, label: "100-Day Club" },
+  { day: 182, icon: Medal, label: "6-Months" },
+  { day: 365, icon: Crown, label: "1-Year" },
+];
+
 // Helper to calculate streak length
 function calculateStreakLength(startDate: Date, endDate: Date): number {
   const oneDay = 24 * 60 * 60 * 1000;
@@ -120,7 +143,7 @@ function calculateStreakLength(startDate: Date, endDate: Date): number {
 
 // Form validation schema
 const formSchema = z.object({
-  title: z.string().min(1, "Title is required."),
+  title: z.string().optional(),
   description: z.string().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color."),
 });
@@ -131,22 +154,74 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
   const { data: streaks } = api.streak.getStreaks.useQuery(undefined, {
     initialData: initialStreaks,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: true,
+    refetchInterval: 60 * 60 * 1000, // Refetch every hour
   });
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStreak, setEditingStreak] = useState<Streak | null>(null);
+  const [celebratingStreak, setCelebratingStreak] = useState<{
+    id: number;
+  } | null>(null);
 
+  // 2. Add toast notifications to your mutations
   const createMutation = api.streak.create.useMutation({
-    onSuccess: () => utils.streak.getStreaks.invalidate(),
+    onSuccess: (data) => {
+      toast.success(`Streak "${data.title}" created!`);
+      void utils.streak.getStreaks.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to create streak", { description: error.message });
+    },
   });
+
   const deleteMutation = api.streak.delete.useMutation({
-    onSuccess: () => utils.streak.getStreaks.invalidate(),
+    onSuccess: (data) => {
+      toast.success(`Streak "${data.title}" deleted.`);
+      void utils.streak.getStreaks.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to delete streak", { description: error.message });
+    },
   });
+
   const updateMutation = api.streak.update.useMutation({
-    onSuccess: () => utils.streak.getStreaks.invalidate(),
+    onSuccess: (data) => {
+      toast.success(`Streak "${data.title}" updated.`);
+      void utils.streak.getStreaks.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to update streak", { description: error.message });
+    },
   });
+
   const extendMutation = api.streak.extend.useMutation({
-    onSuccess: () => utils.streak.getStreaks.invalidate(),
+    onSuccess: (data) => {
+      const oldStreak = streaks?.find((s) => s.id === data.id);
+      if (oldStreak) {
+        const oldLength = calculateStreakLength(
+          oldStreak.currentStartDate,
+          oldStreak.currentEndDate,
+        );
+        const newLength = oldLength + 1;
+        const newMilestone = milestones.find((m) => m.day === newLength);
+
+        if (newMilestone) {
+          toast.success(`Milestone Reached: ${newMilestone.label} Streak! 🎉`);
+          setCelebratingStreak({
+            id: data.id,
+          });
+          setTimeout(() => setCelebratingStreak(null), 20000); // Stop confetti
+        } else {
+          toast.success(`Extended "${data.title}"! Keep it up! 🔥`);
+        }
+      }
+      void utils.streak.getStreaks.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to extend streak", { description: error.message });
+    },
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -215,6 +290,20 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
               ? "rgba(255,255,255,0.08)"
               : "rgba(0,0,0,0.05)";
 
+          // Flame size based on progress
+          const flameSize = 200 + 200 * (progress / 100);
+
+          const alreadyExtendedToday =
+            new Date().toDateString() ===
+            new Date(streak.currentEndDate).toDateString();
+
+          //check for milestones
+          const earnedBadges = milestones.filter((m) => currentLength >= m.day);
+          const nextMilestone = milestones.find((m) => currentLength < m.day);
+          const daysToNext = nextMilestone
+            ? nextMilestone.day - currentLength
+            : 0;
+
           return (
             <Card
               key={streak.id}
@@ -229,10 +318,28 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
               }}
             >
               <Flame
-                size={200}
-                className="absolute -right-12 -bottom-12 z-0"
+                size={flameSize}
+                className="absolute -right-12 -bottom-12 z-0 transition-all duration-500 ease-in-out"
                 style={{ color: flameColor }}
               />
+              {/* --- 1. Confetti inside the Card --- */}
+              {celebratingStreak?.id === streak.id && (
+                <Confetti
+                  width={window.innerWidth}
+                  height={window.innerHeight}
+                  recycle={false}
+                  numberOfPieces={150}
+                  initialVelocityX={10}
+                  initialVelocityY={5}
+                  confettiSource={{
+                    x: 0,
+                    y: 0,
+                    w: 0,
+                    h: 0,
+                  }}
+                  className="!fixed" // Use fixed positioning relative to viewport
+                />
+              )}
 
               <div className="relative z-10 flex h-full flex-col p-6">
                 <CardHeader className="p-0">
@@ -243,7 +350,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                       </CardTitle>
                       {streak.description && (
                         <CardDescription
-                          className="mt-1"
+                          className="mt-1 text-wrap"
                           style={{ color: subtleTextColor }}
                         >
                           {streak.description}
@@ -255,7 +362,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="options-button h-8 w-8 shrink-0 rounded-full"
+                          className="options-button absolute top-2 right-2 h-8 w-8 rounded-full"
                           style={{
                             color: textColor,
                             // @ts-expect-error custom property
@@ -333,13 +440,11 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                   <Progress
                     value={progress}
                     className="progress-bar h-2 w-full"
-                    style={
+                    style={{
                       // @ts-expect-error custom property
-                      {
-                        "--progress-bg": subtleTextColor,
-                        "--progress-indicator": textColor,
-                      }
-                    }
+                      "--progress-bg": subtleTextColor,
+                      "--progress-indicator": textColor,
+                    }}
                   />
                   <p
                     className="mt-3 text-center text-xs"
@@ -355,18 +460,71 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                       },
                     )}
                   </p>
+                  {/* 2. Add Milestone Display */}
+                  <div className="mt-4 space-y-2">
+                    {earnedBadges.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        {earnedBadges.map((badge) => (
+                          <Tooltip key={badge.day}>
+                            <TooltipTrigger asChild>
+                              <div
+                                className="flex h-8 w-8 items-center justify-center rounded-full"
+                                style={{
+                                  backgroundColor: subtleTextColor,
+                                  color: baseColor,
+                                }}
+                                title={`${badge.label} Streak`}
+                              >
+                                <badge.icon className="h-5 w-5" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {badge.label} Streak
+                            </TooltipContent>
+                          </Tooltip>
+                        ))}
+                      </div>
+                    )}
+                    {nextMilestone && (
+                      <p
+                        className="text-center text-xs"
+                        style={{ color: subtleTextColor }}
+                      >
+                        Next milestone in{" "}
+                        <span
+                          className="font-bold"
+                          style={{ color: textColor }}
+                        >
+                          {daysToNext}
+                        </span>{" "}
+                        {daysToNext > 1 ? "days" : "day"}!
+                      </p>
+                    )}
+                  </div>
                 </CardContent>
 
                 <CardFooter className="mt-auto p-0 pt-6">
                   <Button
+                    id={`extend-button-${streak.id}`} // 3. Add unique ID
                     className="w-full rounded-lg py-6 text-base font-semibold"
                     onClick={() => extendMutation.mutate({ id: streak.id })}
+                    disabled={alreadyExtendedToday}
                     style={{
                       backgroundColor: textColor,
                       color: baseColor,
                     }}
                   >
-                    <Calendar className="mr-2 h-5 w-5" /> Extend Streak
+                    {alreadyExtendedToday ? (
+                      <>
+                        <CheckCircle className="mr-2 h-5 w-5" />
+                        Completed for Today
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="mr-2 h-5 w-5" />
+                        Extend Streak
+                      </>
+                    )}
                   </Button>
                 </CardFooter>
               </div>

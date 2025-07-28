@@ -16,7 +16,7 @@ export const streaks = createTable(
   "streak",
   (d) => ({
     id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-    title: d.varchar({ length: 256 }).notNull(),
+    title: d.varchar({ length: 256 }),
     description: d.text(),
     color: d.varchar({ length: 7 }).default("#000000").notNull(),
     longestStreak: d.integer().default(0).notNull(),
