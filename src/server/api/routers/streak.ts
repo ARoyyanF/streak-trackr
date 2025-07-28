@@ -83,8 +83,8 @@ export const streakRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.number(),
-        title: z.string().min(1).optional(),
-        description: z.string().min(1).optional(),
+        title: z.string().min(1),
+        description: z.string().optional(),
         color: z.string().length(7).optional(),
       }),
     )
