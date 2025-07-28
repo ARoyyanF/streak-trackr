@@ -1,29 +1,74 @@
-# Create T3 App
+# Streak Trackr
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+An elegant and minimalist application designed to help you build and maintain positive habits by tracking your streaks. Built on the science of consistency, this tool helps you visualize your progress and understand the power of small, daily actions.
 
-## What's next? How do I make an app with this?
+## Understanding the Engine of Personal Growth
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+Lasting change begins with understanding the hidden engine that drives our behavior: our habits. This tool is built upon the foundational ideas from psychology and bestselling authors that explain how consistency transforms us over time. It's designed to help you apply these principles and see them work in your own life.
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Core Features
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+- **Create & Manage Streaks:** Easily add new habits you want to track.
+- **Daily Check-ins:** Mark your habit as complete for the day with a single click.
+- **Visual Progress:** See your current streak and longest streak for each habit.
+- **Streak History:** A calendar view (/history/[id]) shows your day-by-day consistency for each habit.
+- **Forgiveness Included:** Life happens. A built-in 3-day cushion means your streak won't break if you miss a day or two.
+- **Secure Authentication:** Uses NextAuth.js for secure sign-in, keeping your data private.
+- **The "Why" Page:** A dedicated page (/why) explaining the psychological principles (The Compound Effect, Atomic Habits, etc.) that make streak tracking effective.
+- **Light & Dark Mode:** A sleek, modern UI that adapts to your system's theme.
 
-## Learn More
+## Technology Stack
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+This project is built with a modern, type-safe stack:
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+- Framework: Next.js (with App Router)
+- Language: TypeScript
+- API Layer: tRPC (for end-to-end type-safe APIs)
+- ORM: Drizzle
+- Authentication: NextAuth.js
+- Database: Designed for PostgreSQL, but adaptable via ORM.
+- Styling: Tailwind CSS
+- UI Components: shadcn/ui
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+## Getting Started
 
-## How do I deploy this?
+To get a local copy up and running, follow these simple steps.
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+### Prerequisites
+
+- Node.js v22
+- pnpm
+- A PostgreSQL database (or you can adapt schema.prisma for another database like SQLite)
+
+### Installation & Setup
+
+1. Clone the repository:
+   ```
+   bash git clone https://github.com/ARoyyanF/streak-trackr.git
+   cd streak-trackr
+   ```
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+3. Set up environment variables:  
+   Create a `.env` file in the root of the project referring to `.env`.example file
+
+4. Push the database schema:  
+   This command will sync your schema with your database.
+   ```bash
+   pnpm db:push
+   ```
+5. Run the development server:
+   ```bash
+   pnpm dev
+   ```
+6. Open http://localhost:3000 with your browser to see the result.
+
+## Acknowledgements
+
+This project's philosophy is heavily inspired by the work of:
+
+- James Clear, "Atomic Habits"
+- Darren Hardy, "The Compound Effect"
+- Charles Duhigg, "The Power of Habit"
