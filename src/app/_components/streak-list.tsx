@@ -133,8 +133,8 @@ const milestones = [
 // Helper to calculate streak length
 function calculateStreakLength(startDate: Date, endDate: Date): number {
   const oneDay = 24 * 60 * 60 * 1000;
-  const start = new Date(startDate.toDateString());
-  const end = new Date(endDate.toDateString());
+  const start = new Date(startDate);
+  const end = new Date(endDate);
   const diffDays = Math.round(
     Math.abs((end.getTime() - start.getTime()) / oneDay),
   );
@@ -158,6 +158,16 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
     refetchOnMount: true,
     refetchInterval: 60 * 60 * 1000, // Refetch every hour
   });
+
+  const [clientDateTime] = api.streak.getClientDateTime.useSuspenseQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: true,
+      refetchInterval: 60 * 60 * 1000, // Refetch every hour
+    },
+  );
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingStreak, setEditingStreak] = useState<Streak | null>(null);
@@ -292,10 +302,12 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
 
           // Flame size based on progress
           const flameSize = 200 + 200 * (progress / 100);
-
+          // console.log("clientDateTime", clientDateTime);
+          const endDate = new Date(streak.currentEndDate);
           const alreadyExtendedToday =
-            new Date().toDateString() ===
-            new Date(streak.currentEndDate).toDateString();
+            clientDateTime.getUTCFullYear() === endDate.getUTCFullYear() &&
+            clientDateTime.getUTCMonth() === endDate.getUTCMonth() &&
+            clientDateTime.getUTCDate() === endDate.getUTCDate();
 
           //check for milestones
           const earnedBadges = milestones.filter((m) => currentLength >= m.day);
@@ -451,14 +463,12 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                     style={{ color: subtleTextColor }}
                   >
                     On a streak since{" "}
-                    {new Date(streak.currentStartDate).toLocaleDateString(
-                      "en-US",
-                      {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      },
-                    )}
+                    {new Intl.DateTimeFormat("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(streak.currentStartDate))}
                   </p>
                   {/* 2. Add Milestone Display */}
                   <div className="mt-4 space-y-2">
@@ -507,7 +517,12 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                   <Button
                     id={`extend-button-${streak.id}`} // 3. Add unique ID
                     className="w-full rounded-lg py-6 text-base font-semibold"
-                    onClick={() => extendMutation.mutate({ id: streak.id })}
+                    onClick={() =>
+                      extendMutation.mutate({
+                        id: streak.id,
+                        timezoneOffset: new Date().getTimezoneOffset() / -60, // Pass timezone of the client as hours, not the server (because only client press the button, not the server)
+                      })
+                    }
                     disabled={alreadyExtendedToday}
                     style={{
                       backgroundColor: textColor,

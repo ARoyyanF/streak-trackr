@@ -60,6 +60,7 @@ export const users = createTable("user", (d) => ({
     })
     .default(sql`CURRENT_TIMESTAMP`),
   image: d.varchar({ length: 255 }),
+  timezoneOffset: d.integer().default(0).notNull(),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({

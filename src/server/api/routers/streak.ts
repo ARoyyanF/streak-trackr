@@ -1,10 +1,12 @@
+import { StreakList } from "~/app/_components/streak-list";
 import { TRPCError } from "@trpc/server";
 
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { streaks } from "~/server/db/schema";
+import { streaks, users } from "~/server/db/schema";
+import { get } from "http";
 
 // Helper function to calculate the inclusive day count between two dates
 function calculateStreakLength(startDate: Date, endDate: Date): number {
@@ -23,12 +25,47 @@ export const streakRouter = createTRPCRouter({
   /**
    * Get all streaks for the current user.
    */
-  getStreaks: protectedProcedure.query(({ ctx }) => {
-    return ctx.db
+  getStreaks: protectedProcedure.query(async ({ ctx }) => {
+    const streakList = await ctx.db
       .select()
       .from(streaks)
       .where(eq(streaks.createdById, ctx.session.user.id))
       .orderBy(desc(streaks.createdAt));
+
+    //get timezone offset for the user
+    const timezoneOffset = (
+      await ctx.db
+        .select({ timezoneOffset: users.timezoneOffset })
+        .from(users)
+        .where(eq(users.id, ctx.session.user.id))
+    )[0]!.timezoneOffset;
+    const timezoneOffsetMs = timezoneOffset * 60 * 60 * 1000; // Convert to milliseconds
+
+    // apply timezone offset to dates
+    const formattedStreakList = streakList.map((streak) => ({
+      ...streak,
+      currentStartDate: new Date(
+        streak.currentStartDate.getTime() + timezoneOffsetMs,
+      ),
+      currentEndDate: new Date(
+        streak.currentEndDate.getTime() + timezoneOffsetMs,
+      ),
+    }));
+    return formattedStreakList;
+  }),
+
+  getClientDateTime: protectedProcedure.query(async ({ ctx }) => {
+    let timezoneOffset = 0; // Default to UTC if no user found
+    const result = (
+      await ctx.db
+        .select({ timezoneOffset: users.timezoneOffset })
+        .from(users)
+        .where(eq(users.id, ctx.session.user.id))
+    )[0];
+    if (result) {
+      timezoneOffset = result.timezoneOffset;
+    }
+    return new Date(new Date().getTime() + timezoneOffset * 60 * 60 * 1000);
   }),
 
   /**
@@ -127,7 +164,7 @@ export const streakRouter = createTRPCRouter({
    * This is typically called when a user completes a daily task.
    */
   extend: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number(), timezoneOffset: z.number() }))
     .mutation(async ({ ctx, input }) => {
       // 1. Fetch the full streak object
       const [streak] = await ctx.db
@@ -195,6 +232,12 @@ export const streakRouter = createTRPCRouter({
           })
           .where(eq(streaks.id, input.id));
       }
+      // 4. Update the user's timezone
+      await ctx.db
+        .update(users)
+        .set({ timezoneOffset: input.timezoneOffset })
+        .where(eq(users.id, ctx.session.user.id));
+
       return streak;
     }),
 });

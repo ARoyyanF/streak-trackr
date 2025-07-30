@@ -124,8 +124,13 @@ export default async function Home() {
     );
   }
 
-  // If there is a session, prefetch and render the streaks
+  // get the initial streaks for the user
+  // This will be used to render the streak list on the client side
   const initialStreaks = await api.streak.getStreaks();
+
+  // Prefetch the client date/time for the user
+  // This ensures the server has the client's date/time ready for rendering
+  void api.streak.getClientDateTime.prefetch();
 
   return (
     <HydrateClient>
