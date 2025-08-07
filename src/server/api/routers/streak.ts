@@ -186,9 +186,9 @@ export const streakRouter = createTRPCRouter({
 
       // 2. Check if the streak is broken
       const today = new Date();
-      const threeDaysInMs = 3 * 24 * 60 * 60 * 1000;
+      const fourDaysInMs = 4 * 24 * 60 * 60 * 1000;
       const differenceInMs = today.getTime() - streak.currentEndDate.getTime();
-      const isBroken = differenceInMs > threeDaysInMs;
+      const isBroken = differenceInMs > fourDaysInMs;
 
       // 3. Perform conditional update
       if (isBroken) {
