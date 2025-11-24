@@ -38,6 +38,7 @@ export const streaks = createTable(
       .default(sql`CURRENT_TIMESTAMP`)
       .notNull(),
     updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
+    position: d.integer().default(0).notNull(),
   }),
   (t) => [
     index(`${projectPrefix}streak_createdby_idx`).on(t.createdById),

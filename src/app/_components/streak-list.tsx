@@ -1,13 +1,30 @@
 // app/_components/streak-list.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { type RouterOutputs, api } from "~/trpc/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import Confetti from "react-confetti"; // For animations
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import {
   MoreHorizontal,
@@ -23,6 +40,7 @@ import {
   Crown,
   Medal,
   Flag, // For badges
+  ArrowUpDown,
 } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -148,6 +166,49 @@ const formSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color."),
 });
 
+function SortableItem({
+  id,
+  children,
+  isReordering,
+}: {
+  id: number;
+  children: React.ReactNode;
+  isReordering: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.5 : 1,
+    touchAction: "none",
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(isReordering ? attributes : {})}
+      {...(isReordering ? listeners : {})}
+      className={
+        isReordering && !isDragging
+          ? "animate-shake cursor-grab active:cursor-grabbing"
+          : ""
+      }
+    >
+      {children}
+    </div>
+  );
+}
+
 export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
   const utils = api.useUtils();
 
@@ -174,11 +235,54 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
   const [celebratingStreak, setCelebratingStreak] = useState<{
     id: number;
   } | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
+  const [optimisticStreaks, setOptimisticStreaks] =
+    useState<Streak[]>(initialStreaks);
+
+  useEffect(() => {
+    if (streaks) {
+      setOptimisticStreaks(streaks);
+    }
+  }, [streaks]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const reorderMutation = api.streak.reorder.useMutation({
+    onSuccess: () => {
+      void utils.streak.getStreaks.invalidate();
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setOptimisticStreaks((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+
+        // Trigger mutation
+        const reorderedItems = newItems.map((item, index) => ({
+          id: item.id,
+          position: index,
+        }));
+        reorderMutation.mutate(reorderedItems);
+
+        return newItems;
+      });
+    }
+  };
 
   // 2. Add toast notifications to your mutations
   const createMutation = api.streak.create.useMutation({
     onSuccess: (data) => {
-      toast.success(`Streak "${data.title}" created!`);
+      toast.success(`Streak ${data.title} created!`);
       void utils.streak.getStreaks.invalidate();
     },
     onError: (error) => {
@@ -224,7 +328,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
           });
           setTimeout(() => setCelebratingStreak(null), 20000); // Stop confetti
         } else {
-          toast.success(`Extended "${data.title}"! Keep it up! 🔥`);
+          toast.success(`Extended ${data.title}! Keep it up! 🔥`);
         }
       }
       void utils.streak.getStreaks.invalidate();
@@ -270,284 +374,328 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
 
   return (
     <div className="container mx-auto p-6 md:p-8">
+      <style>{`
+        @keyframes shake {
+          0% { transform: rotate(0deg); }
+          25% { transform: rotate(0.3deg); }
+          50% { transform: rotate(0deg); }
+          75% { transform: rotate(-0.3deg); }
+          100% { transform: rotate(0deg); }
+        }
+        .animate-shake {
+          animation: shake 0.2s infinite;
+        }
+      `}</style>
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-4xl font-bold tracking-tight">Your Streaks</h1>
-        <Button onClick={handleAddNewClick}>
-          <Plus className="mr-2 h-4 w-4" /> Create Streak
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant={isReordering ? "secondary" : "outline"}
+            onClick={() => setIsReordering(!isReordering)}
+          >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            {isReordering ? "Done Reordering" : "Reorder"}
+          </Button>
+          <Button onClick={handleAddNewClick}>
+            <Plus className="mr-2 h-4 w-4" /> Create Streak
+          </Button>
+        </div>
       </header>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={optimisticStreaks.map((s) => s.id)}
+          strategy={rectSortingStrategy}
+        >
+          <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {optimisticStreaks.map((streak) => {
+              const currentLength = calculateStreakLength(
+                streak.currentStartDate,
+                streak.currentEndDate,
+              );
+              // 6 months is ~182 days
+              const progress = Math.min((currentLength / 182) * 100, 100);
 
-      <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {streaks?.map((streak) => {
-          const currentLength = calculateStreakLength(
-            streak.currentStartDate,
-            streak.currentEndDate,
-          );
-          // 6 months is ~182 days
-          const progress = Math.min((currentLength / 182) * 100, 100);
+              // --- Dynamic Style Calculation ---
+              const baseColor = streak.color;
+              const textColor = getContrastingTextColor(baseColor);
+              const layer1Color = adjustColor(baseColor, -10); // Darker shade for bottom layer
+              const layer2Color = adjustColor(baseColor, 10); // Lighter shade for middle layer
+              const subtleTextColor =
+                textColor === "#FFFFFF"
+                  ? "rgba(255,255,255,0.7)"
+                  : "rgba(0,0,0,0.6)";
+              const flameColor =
+                textColor === "#FFFFFF"
+                  ? "rgba(255,255,255,0.08)"
+                  : "rgba(0,0,0,0.05)";
 
-          // --- Dynamic Style Calculation ---
-          const baseColor = streak.color;
-          const textColor = getContrastingTextColor(baseColor);
-          const layer1Color = adjustColor(baseColor, -10); // Darker shade for bottom layer
-          const layer2Color = adjustColor(baseColor, 10); // Lighter shade for middle layer
-          const subtleTextColor =
-            textColor === "#FFFFFF"
-              ? "rgba(255,255,255,0.7)"
-              : "rgba(0,0,0,0.6)";
-          const flameColor =
-            textColor === "#FFFFFF"
-              ? "rgba(255,255,255,0.08)"
-              : "rgba(0,0,0,0.05)";
+              // Flame size based on progress
+              const flameSize = 200 + 200 * (progress / 100);
+              // console.log("clientDateTime", clientDateTime);
+              const endDate = new Date(streak.currentEndDate);
+              const alreadyExtendedToday =
+                clientDateTime.getUTCFullYear() === endDate.getUTCFullYear() &&
+                clientDateTime.getUTCMonth() === endDate.getUTCMonth() &&
+                clientDateTime.getUTCDate() === endDate.getUTCDate();
 
-          // Flame size based on progress
-          const flameSize = 200 + 200 * (progress / 100);
-          // console.log("clientDateTime", clientDateTime);
-          const endDate = new Date(streak.currentEndDate);
-          const alreadyExtendedToday =
-            clientDateTime.getUTCFullYear() === endDate.getUTCFullYear() &&
-            clientDateTime.getUTCMonth() === endDate.getUTCMonth() &&
-            clientDateTime.getUTCDate() === endDate.getUTCDate();
+              //check for milestones
+              const earnedBadges = milestones.filter(
+                (m) => currentLength >= m.day,
+              );
+              const nextMilestone = milestones.find(
+                (m) => currentLength < m.day,
+              );
+              const daysToNext = nextMilestone
+                ? nextMilestone.day - currentLength
+                : 0;
 
-          //check for milestones
-          const earnedBadges = milestones.filter((m) => currentLength >= m.day);
-          const nextMilestone = milestones.find((m) => currentLength < m.day);
-          const daysToNext = nextMilestone
-            ? nextMilestone.day - currentLength
-            : 0;
-
-          return (
-            <Card
-              key={streak.id}
-              className="relative flex transform-gpu flex-col overflow-hidden rounded-2xl border-none shadow-lg transition-transform hover:scale-[1.02]"
-              style={{
-                backgroundColor: layer1Color,
-                backgroundImage: `
+              return (
+                <SortableItem
+                  key={streak.id}
+                  id={streak.id}
+                  isReordering={isReordering}
+                >
+                  <Card
+                    className="relative flex transform-gpu flex-col overflow-hidden rounded-2xl border-none shadow-lg transition-transform hover:scale-[1.02]"
+                    style={{
+                      backgroundColor: layer1Color,
+                      backgroundImage: `
                   radial-gradient(circle at 100% 0%, ${layer2Color} 0%, transparent 40%),
                   radial-gradient(circle at 0% 100%, ${baseColor} 0%, transparent 40%)
                 `,
-                color: textColor,
-              }}
-            >
-              <Flame
-                size={flameSize}
-                className="absolute -right-12 -bottom-12 z-0 transition-all duration-500 ease-in-out"
-                style={{ color: flameColor }}
-              />
-              {/* --- 1. Confetti inside the Card --- */}
-              {celebratingStreak?.id === streak.id && (
-                <Confetti
-                  width={window.innerWidth}
-                  height={window.innerHeight}
-                  recycle={false}
-                  numberOfPieces={150}
-                  initialVelocityX={10}
-                  initialVelocityY={5}
-                  confettiSource={{
-                    x: 0,
-                    y: 0,
-                    w: 0,
-                    h: 0,
-                  }}
-                  className="!fixed" // Use fixed positioning relative to viewport
-                />
-              )}
+                      color: textColor,
+                    }}
+                  >
+                    <Flame
+                      size={flameSize}
+                      className="absolute -right-12 -bottom-12 z-0 transition-all duration-500 ease-in-out"
+                      style={{ color: flameColor }}
+                    />
+                    {/* --- 1. Confetti inside the Card --- */}
+                    {celebratingStreak?.id === streak.id && (
+                      <Confetti
+                        width={window.innerWidth}
+                        height={window.innerHeight}
+                        recycle={false}
+                        numberOfPieces={150}
+                        initialVelocityX={10}
+                        initialVelocityY={5}
+                        confettiSource={{
+                          x: 0,
+                          y: 0,
+                          w: 0,
+                          h: 0,
+                        }}
+                        className="!fixed" // Use fixed positioning relative to viewport
+                      />
+                    )}
 
-              <div className="relative z-10 flex h-full flex-col p-6">
-                <CardHeader className="p-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-2xl font-bold">
-                        {streak.title}
-                      </CardTitle>
-                      {streak.description && (
-                        <CardDescription
-                          className="mt-1 text-wrap"
+                    <div className="relative z-10 flex h-full flex-col p-6">
+                      <CardHeader className="p-0">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-2xl font-bold">
+                              {streak.title}
+                            </CardTitle>
+                            {streak.description && (
+                              <CardDescription
+                                className="mt-1 text-wrap"
+                                style={{ color: subtleTextColor }}
+                              >
+                                {streak.description}
+                              </CardDescription>
+                            )}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="options-button absolute top-2 right-2 h-8 w-8 rounded-full"
+                                style={{
+                                  color: textColor,
+                                  // @ts-expect-error custom property
+                                  "--hover-bg": subtleTextColor,
+                                }}
+                              >
+                                <MoreHorizontal className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem
+                                onClick={() => handleEditClick(streak)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Are you sure?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will
+                                      permanently delete your streak.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        deleteMutation.mutate({ id: streak.id })
+                                      }
+                                    >
+                                      Continue
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="flex-grow p-0 pt-6">
+                        <div className="mb-4 flex items-end justify-between">
+                          <div>
+                            <p
+                              className="text-sm font-medium"
+                              style={{ color: subtleTextColor }}
+                            >
+                              Current
+                            </p>
+                            <p className="text-5xl leading-none font-bold">
+                              {currentLength}
+                              <span className="text-3xl font-medium">d</span>
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p
+                              className="text-sm font-medium"
+                              style={{ color: subtleTextColor }}
+                            >
+                              Longest
+                            </p>
+                            <p className="text-xl font-semibold">
+                              {Math.max(currentLength, streak.longestStreak)}d
+                            </p>
+                          </div>
+                        </div>
+                        <Progress
+                          value={progress}
+                          className="progress-bar h-2 w-full"
+                          style={{
+                            // @ts-expect-error custom property
+                            "--progress-bg": subtleTextColor,
+                            "--progress-indicator": textColor,
+                          }}
+                        />
+                        <p
+                          className="mt-3 text-center text-xs"
                           style={{ color: subtleTextColor }}
                         >
-                          {streak.description}
-                        </CardDescription>
-                      )}
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                          On a streak since{" "}
+                          {new Intl.DateTimeFormat("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            timeZone: "UTC",
+                          }).format(new Date(streak.currentStartDate))}
+                        </p>
+                        {/* 2. Add Milestone Display */}
+                        <div className="mt-4 space-y-2">
+                          {earnedBadges.length > 0 && (
+                            <div className="flex items-center gap-2">
+                              {earnedBadges.map((badge) => (
+                                <Tooltip key={badge.day}>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      className="flex h-8 w-8 items-center justify-center rounded-full"
+                                      style={{
+                                        backgroundColor: subtleTextColor,
+                                        color: baseColor,
+                                      }}
+                                      title={`${badge.label} Streak`}
+                                    >
+                                      <badge.icon className="h-5 w-5" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {badge.label} Streak
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                            </div>
+                          )}
+                          {nextMilestone && (
+                            <p
+                              className="text-center text-xs"
+                              style={{ color: subtleTextColor }}
+                            >
+                              Next milestone in{" "}
+                              <span
+                                className="font-bold"
+                                style={{ color: textColor }}
+                              >
+                                {daysToNext}
+                              </span>{" "}
+                              {daysToNext > 1 ? "days" : "day"}!
+                            </p>
+                          )}
+                        </div>
+                      </CardContent>
+
+                      <CardFooter className="mt-auto p-0 pt-6">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          className="options-button absolute top-2 right-2 h-8 w-8 rounded-full"
+                          id={`extend-button-${streak.id}`} // 3. Add unique ID
+                          className="w-full rounded-lg py-6 text-base font-semibold"
+                          onClick={() =>
+                            extendMutation.mutate({
+                              id: streak.id,
+                              timezoneOffset:
+                                new Date().getTimezoneOffset() / -60, // Pass timezone of the client as hours, not the server (because only client press the button, not the server)
+                            })
+                          }
+                          disabled={alreadyExtendedToday}
                           style={{
-                            color: textColor,
-                            // @ts-expect-error custom property
-                            "--hover-bg": subtleTextColor,
+                            backgroundColor: textColor,
+                            color: baseColor,
                           }}
                         >
-                          <MoreHorizontal className="h-5 w-5" />
+                          {alreadyExtendedToday ? (
+                            <>
+                              <CheckCircle className="mr-2 h-5 w-5" />
+                              Completed for Today
+                            </>
+                          ) : (
+                            <>
+                              <Calendar className="mr-2 h-5 w-5" />
+                              Extend Streak
+                            </>
+                          )}
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem
-                          onClick={() => handleEditClick(streak)}
-                        >
-                          <Edit className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <DropdownMenuItem
-                              onSelect={(e) => e.preventDefault()}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will
-                                permanently delete your streak.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() =>
-                                  deleteMutation.mutate({ id: streak.id })
-                                }
-                              >
-                                Continue
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="flex-grow p-0 pt-6">
-                  <div className="mb-4 flex items-end justify-between">
-                    <div>
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: subtleTextColor }}
-                      >
-                        Current
-                      </p>
-                      <p className="text-5xl leading-none font-bold">
-                        {currentLength}
-                        <span className="text-3xl font-medium">d</span>
-                      </p>
+                      </CardFooter>
                     </div>
-                    <div className="text-right">
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: subtleTextColor }}
-                      >
-                        Longest
-                      </p>
-                      <p className="text-xl font-semibold">
-                        {Math.max(currentLength, streak.longestStreak)}d
-                      </p>
-                    </div>
-                  </div>
-                  <Progress
-                    value={progress}
-                    className="progress-bar h-2 w-full"
-                    style={{
-                      // @ts-expect-error custom property
-                      "--progress-bg": subtleTextColor,
-                      "--progress-indicator": textColor,
-                    }}
-                  />
-                  <p
-                    className="mt-3 text-center text-xs"
-                    style={{ color: subtleTextColor }}
-                  >
-                    On a streak since{" "}
-                    {new Intl.DateTimeFormat("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                      timeZone: "UTC",
-                    }).format(new Date(streak.currentStartDate))}
-                  </p>
-                  {/* 2. Add Milestone Display */}
-                  <div className="mt-4 space-y-2">
-                    {earnedBadges.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        {earnedBadges.map((badge) => (
-                          <Tooltip key={badge.day}>
-                            <TooltipTrigger asChild>
-                              <div
-                                className="flex h-8 w-8 items-center justify-center rounded-full"
-                                style={{
-                                  backgroundColor: subtleTextColor,
-                                  color: baseColor,
-                                }}
-                                title={`${badge.label} Streak`}
-                              >
-                                <badge.icon className="h-5 w-5" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {badge.label} Streak
-                            </TooltipContent>
-                          </Tooltip>
-                        ))}
-                      </div>
-                    )}
-                    {nextMilestone && (
-                      <p
-                        className="text-center text-xs"
-                        style={{ color: subtleTextColor }}
-                      >
-                        Next milestone in{" "}
-                        <span
-                          className="font-bold"
-                          style={{ color: textColor }}
-                        >
-                          {daysToNext}
-                        </span>{" "}
-                        {daysToNext > 1 ? "days" : "day"}!
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-
-                <CardFooter className="mt-auto p-0 pt-6">
-                  <Button
-                    id={`extend-button-${streak.id}`} // 3. Add unique ID
-                    className="w-full rounded-lg py-6 text-base font-semibold"
-                    onClick={() =>
-                      extendMutation.mutate({
-                        id: streak.id,
-                        timezoneOffset: new Date().getTimezoneOffset() / -60, // Pass timezone of the client as hours, not the server (because only client press the button, not the server)
-                      })
-                    }
-                    disabled={alreadyExtendedToday}
-                    style={{
-                      backgroundColor: textColor,
-                      color: baseColor,
-                    }}
-                  >
-                    {alreadyExtendedToday ? (
-                      <>
-                        <CheckCircle className="mr-2 h-5 w-5" />
-                        Completed for Today
-                      </>
-                    ) : (
-                      <>
-                        <Calendar className="mr-2 h-5 w-5" />
-                        Extend Streak
-                      </>
-                    )}
-                  </Button>
-                </CardFooter>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
+                  </Card>
+                </SortableItem>
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>{" "}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>

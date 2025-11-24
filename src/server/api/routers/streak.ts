@@ -1,12 +1,10 @@
-import { StreakList } from "~/app/_components/streak-list";
 import { TRPCError } from "@trpc/server";
 
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { streaks, users } from "~/server/db/schema";
-import { get } from "http";
 
 // Helper function to calculate the inclusive day count between two dates
 function calculateStreakLength(startDate: Date, endDate: Date): number {
@@ -30,7 +28,7 @@ export const streakRouter = createTRPCRouter({
       .select()
       .from(streaks)
       .where(eq(streaks.createdById, ctx.session.user.id))
-      .orderBy(desc(streaks.createdAt));
+      .orderBy(asc(streaks.position), desc(streaks.createdAt));
 
     //get timezone offset for the user
     const timezoneOffset = (
@@ -69,6 +67,28 @@ export const streakRouter = createTRPCRouter({
   }),
 
   /**
+   * Reorder streaks.
+   */
+  reorder: protectedProcedure
+    .input(z.array(z.object({ id: z.number(), position: z.number() })))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.transaction(async (tx) => {
+        for (const item of input) {
+          await tx
+            .update(streaks)
+            .set({ position: item.position })
+            .where(
+              and(
+                eq(streaks.id, item.id),
+                eq(streaks.createdById, ctx.session.user.id),
+              ),
+            );
+        }
+      });
+      return { success: true };
+    }),
+
+  /**
    * Create a new streak.
    */
   create: protectedProcedure
@@ -80,6 +100,15 @@ export const streakRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      const [maxPos] = await ctx.db
+        .select({ position: streaks.position })
+        .from(streaks)
+        .where(eq(streaks.createdById, ctx.session.user.id))
+        .orderBy(desc(streaks.position))
+        .limit(1);
+
+      const nextPosition = (maxPos?.position ?? 0) + 1;
+
       const [streak] = await ctx.db
         .insert(streaks)
         .values({
@@ -89,6 +118,7 @@ export const streakRouter = createTRPCRouter({
           createdById: ctx.session.user.id,
           currentStartDate: new Date(),
           currentEndDate: new Date(),
+          position: nextPosition,
         })
         .returning();
 
