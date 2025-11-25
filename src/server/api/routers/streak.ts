@@ -268,6 +268,15 @@ export const streakRouter = createTRPCRouter({
         .set({ timezoneOffset: input.timezoneOffset })
         .where(eq(users.id, ctx.session.user.id));
 
-      return streak;
+      const [updatedStreak] = await ctx.db
+        .select()
+        .from(streaks)
+        .where(
+          and(
+            eq(streaks.id, input.id),
+            eq(streaks.createdById, ctx.session.user.id),
+          ),
+        );
+      return updatedStreak;
     }),
 });

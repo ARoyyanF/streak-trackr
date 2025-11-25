@@ -318,8 +318,13 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
           oldStreak.currentStartDate,
           oldStreak.currentEndDate,
         );
-        const newLength = oldLength + 1;
-        const newMilestone = milestones.find((m) => m.day === newLength);
+        const newLength = calculateStreakLength(
+          data.currentStartDate,
+          data.currentEndDate,
+        );
+        const newMilestone = milestones
+          .filter((m) => m.day > oldLength && m.day <= newLength)
+          .pop();
 
         if (newMilestone) {
           toast.success(`Milestone Reached: ${newMilestone.label} Streak! 🎉`);
@@ -330,8 +335,13 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
         } else {
           toast.success(`Extended ${data.title}! Keep it up! 🔥`);
         }
+        console.log("milestones: ", milestones);
+        console.log("newMilestone: ", newMilestone);
       }
       void utils.streak.getStreaks.invalidate();
+
+      console.log("oldStreak: ", oldStreak);
+      console.log("data: ", data);
     },
     onError: (error) => {
       toast.error("Failed to extend streak", { description: error.message });
