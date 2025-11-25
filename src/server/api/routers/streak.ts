@@ -277,6 +277,14 @@ export const streakRouter = createTRPCRouter({
             eq(streaks.createdById, ctx.session.user.id),
           ),
         );
-      return updatedStreak;
+
+      if (!updatedStreak) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Extend: Failed to retrieve updated streak.",
+        });
+      }
+
+      return { ...updatedStreak, wasReset: isBroken };
     }),
 });

@@ -332,6 +332,8 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
             id: data.id,
           });
           setTimeout(() => setCelebratingStreak(null), 20000); // Stop confetti
+        } else if (data.wasReset) {
+          toast.success(`Streak reset! Let's build it up again! 💪`);
         } else {
           toast.success(`Extended ${data.title}! Keep it up! 🔥`);
         }
@@ -529,7 +531,10 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                                 style={{
                                   color: textColor,
                                   // @ts-expect-error custom property
-                                  "--hover-bg": subtleTextColor,
+                                  "--hover-bg":
+                                    textColor === "#FFFFFF"
+                                      ? "rgba(255,255,255,0.2)"
+                                      : "rgba(0,0,0,0.1)",
                                 }}
                               >
                                 <MoreHorizontal className="h-5 w-5" />
