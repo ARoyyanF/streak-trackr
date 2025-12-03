@@ -189,7 +189,8 @@ function SortableItem({
     transition,
     zIndex: isDragging ? 10 : 1,
     opacity: isDragging ? 0.5 : 1,
-    touchAction: "none",
+    // Allow natural touch scrolling when not reordering; disable during reordering/dragging
+    touchAction: isReordering ? "none" : "auto",
   };
 
   return (
@@ -400,7 +401,8 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
       `}</style>
       <header className="mb-8 flex items-center justify-between">
         <h1 className="text-4xl font-bold tracking-tight">Your Streaks</h1>
-        <div className="flex gap-2">
+
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             variant={isReordering ? "secondary" : "outline"}
             onClick={() => setIsReordering(!isReordering)}
