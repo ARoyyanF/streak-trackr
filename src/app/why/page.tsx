@@ -10,7 +10,6 @@ import { Button } from "~/components/ui/button";
 import Link from "next/link";
 import {
   CheckCircle,
-  Target,
   TrendingUp,
   Calendar,
   Zap,
@@ -18,6 +17,7 @@ import {
   BrainCircuit,
   Award,
 } from "lucide-react";
+import { LiaFrogSolid } from "react-icons/lia";
 
 export const metadata: Metadata = {
   title: "The Science of Consistency: How Small Habits Create Big Change",
@@ -118,7 +118,7 @@ export default function WhyPage() {
           {/* Card 4: Eat That Frog */}
           <Card className="flex flex-col">
             <CardHeader>
-              <Target className="text-primary mb-3 h-10 w-10" />
+              <LiaFrogSolid className="text-primary mb-3 h-10 w-10" />
               <CardTitle>Eat That Frog</CardTitle>
               <CardDescription>Tackle Your Most Important Task</CardDescription>
             </CardHeader>
@@ -178,9 +178,9 @@ export default function WhyPage() {
 
       {/* Why Streak Trackr Section -> Reframed as "Putting Knowledge into Action" */}
       <section className="mb-20">
-        <Card className="border-primary/20 bg-slate-50 dark:bg-slate-900">
+        <Card className="border-primary/20 bg-slate-50 dark:bg-stone-800">
           <CardHeader className="text-center">
-            <Award className="mx-auto h-12 w-12 text-amber-500" />
+            <Award className="mx-auto h-12 w-12 fill-amber-500 text-amber-500" />
             <CardTitle className="mt-4 text-3xl font-bold">
               From Theory to Practice
             </CardTitle>
@@ -257,7 +257,7 @@ export default function WhyPage() {
               extraordinary life. This tool is free and here to help.
             </p>
             <div className="flex justify-center gap-4">
-              <Button asChild size="lg" className="shadow-lg">
+              <Button asChild size="lg" className="px-[15vw] shadow-lg">
                 <Link href="/">Start Your First Streak</Link>
               </Button>
             </div>

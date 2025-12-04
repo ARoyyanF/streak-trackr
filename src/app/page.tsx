@@ -12,7 +12,7 @@ import {
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import Link from "next/link";
-import { Sparkles, Target, TrendingUp } from "lucide-react";
+import { ArrowBigRightDash, ChartNoAxesCombined, ScanEye } from "lucide-react";
 
 export default async function Home() {
   const session = await auth();
@@ -20,13 +20,13 @@ export default async function Home() {
   // If there's no session, show the new sign-in prompt
   if (!session?.user) {
     return (
-      <main className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center p-4 lg:flex-row lg:gap-12">
+      <main className="flex min-h-[calc(100vh-5rem)] flex-col items-center justify-center gap-12 p-4 lg:flex-row">
         {/* Left side content - visible on large screens */}
-        <div className="hidden lg:block lg:w-1/2 lg:max-w-lg">
+        <div className="lg:w-1/2 lg:max-w-lg">
           <div className="space-y-8">
             <div>
               <h1 className="mb-4 text-4xl font-bold">
-                Welcome to <span className="text-primary">Streak Trackr</span>
+                Welcome to <span className="text-primary">Streak Tracker</span>
               </h1>
               <p className="text-muted-foreground text-xl">
                 Transform your life through the power of consistent habits
@@ -36,7 +36,7 @@ export default async function Home() {
             <div className="space-y-6">
               <div className="flex items-start gap-4">
                 <div className="bg-primary/10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg">
-                  <Target className="text-primary h-6 w-6" />
+                  <ArrowBigRightDash className="text-primary h-6 w-6" />
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold">Build Momentum</h3>
@@ -49,7 +49,7 @@ export default async function Home() {
 
               <div className="flex items-start gap-4">
                 <div className="bg-primary/10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg">
-                  <TrendingUp className="text-primary h-6 w-6" />
+                  <ChartNoAxesCombined className="text-primary h-6 w-6" />
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold">Compound Growth</h3>
@@ -62,7 +62,7 @@ export default async function Home() {
 
               <div className="flex items-start gap-4">
                 <div className="bg-primary/10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg">
-                  <Sparkles className="text-primary h-6 w-6" />
+                  <ScanEye className="text-primary h-6 w-6" />
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold">Visual Progress</h3>
@@ -107,7 +107,7 @@ export default async function Home() {
               transforms us over time. Discover the principles, this free tool
               is made to help you see them work.
             </p>
-            <Button asChild className="w-full">
+            <Button asChild size="lg" className="w-full">
               <Link href="/api/auth/signin">Sign In to Start Your Journey</Link>
             </Button>
           </CardContent>
