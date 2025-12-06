@@ -287,4 +287,74 @@ export const streakRouter = createTRPCRouter({
 
       return { ...updatedStreak, wasReset: isBroken };
     }),
+
+  /**
+   * Manually end the current streak and start a new one from today.
+   */
+  end: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const [streak] = await ctx.db
+        .select()
+        .from(streaks)
+        .where(
+          and(
+            eq(streaks.id, input.id),
+            eq(streaks.createdById, ctx.session.user.id),
+          ),
+        );
+
+      if (!streak) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "End: Streak not found.",
+        });
+      }
+
+      const today = new Date();
+      const finishedStreakLength = calculateStreakLength(
+        streak.currentStartDate,
+        streak.currentEndDate,
+      );
+
+      const nextStreakNumber =
+        Object.keys(streak.pastStreaks as object).length + 1;
+      const updatedPastStreaks = {
+        ...(streak.pastStreaks as object),
+        [nextStreakNumber]: {
+          start: streak.currentStartDate.toISOString(),
+          end: streak.currentEndDate.toISOString(),
+        },
+      };
+
+      await ctx.db
+        .update(streaks)
+        .set({
+          currentStartDate: today,
+          currentEndDate: today,
+          longestStreak: Math.max(streak.longestStreak, finishedStreakLength),
+          pastStreaks: updatedPastStreaks,
+          updatedAt: new Date(),
+        })
+        .where(eq(streaks.id, input.id));
+
+      const [updatedStreak] = await ctx.db
+        .select()
+        .from(streaks)
+        .where(
+          and(
+            eq(streaks.id, input.id),
+            eq(streaks.createdById, ctx.session.user.id),
+          ),
+        );
+
+      if (!updatedStreak) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "End: Failed to retrieve updated streak.",
+        });
+      }
+
+      return { ...updatedStreak, wasEndedManually: true };
+    }),
 });

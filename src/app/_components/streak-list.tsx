@@ -215,8 +215,8 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
 
   const { data: streaks } = api.streak.getStreaks.useQuery(undefined, {
     initialData: initialStreaks,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     refetchOnMount: true,
     refetchInterval: 60 * 60 * 1000, // Refetch every hour
   });
@@ -226,8 +226,8 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
     {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
-      refetchOnMount: true,
-      refetchInterval: 60 * 60 * 1000, // Refetch every hour
+      refetchOnMount: false,
+      refetchInterval: 12 * 60 * 60 * 1000, // Refetch every 12 hours
     },
   );
 
@@ -298,6 +298,16 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
     },
     onError: (error) => {
       toast.error("Failed to delete streak", { description: error.message });
+    },
+  });
+
+  const endMutation = api.streak.end.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Streak "${data.title}" ended. New streak started today.`);
+      void utils.streak.getStreaks.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Failed to end streak", { description: error.message });
     },
   });
 
@@ -548,6 +558,38 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                               >
                                 <Edit className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                  >
+                                    <Flag className="mr-2 h-4 w-4" /> End Streak
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      End this streak?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will move the current streak to
+                                      history and start a new streak from today.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() =>
+                                        endMutation.mutate({ id: streak.id })
+                                      }
+                                    >
+                                      End streak
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem
