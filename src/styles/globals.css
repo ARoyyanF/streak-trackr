@@ -142,3 +142,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom global scrollbars */
+:root {
+  --scrollbar-thumb: rgba(0, 0, 0, 0.2); /* thumb color w/ alpha 0.2 */
+}
+.dark {
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2); /* thumb color w/ alpha 0.2 */
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
