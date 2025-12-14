@@ -237,14 +237,12 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
     id: number;
   } | null>(null);
   const [isReordering, setIsReordering] = useState(false);
-  const [optimisticStreaks, setOptimisticStreaks] =
-    useState<Streak[]>(initialStreaks);
+  const [optimisticStreaks, setOptimisticStreaks] = useState<Streak[] | null>(
+    null,
+  );
 
-  useEffect(() => {
-    if (streaks) {
-      setOptimisticStreaks(streaks);
-    }
-  }, [streaks]);
+  // Use query data directly, only override with optimistic updates during reordering
+  const displayStreaks = optimisticStreaks ?? streaks ?? initialStreaks;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -254,8 +252,14 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
   );
 
   const reorderMutation = api.streak.reorder.useMutation({
-    onSuccess: () => {
-      void utils.streak.getStreaks.invalidate();
+    onSuccess: async () => {
+      // Wait for refetch to complete before clearing optimistic state
+      await utils.streak.getStreaks.invalidate();
+      setOptimisticStreaks(null);
+    },
+    onError: () => {
+      // Clear optimistic state on error to revert to actual data
+      setOptimisticStreaks(null);
     },
   });
 
@@ -263,20 +267,22 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setOptimisticStreaks((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-        const newItems = arrayMove(items, oldIndex, newIndex);
+      const currentStreaks = streaks ?? initialStreaks;
+      const oldIndex = currentStreaks.findIndex(
+        (item) => item.id === active.id,
+      );
+      const newIndex = currentStreaks.findIndex((item) => item.id === over.id);
+      const newItems = arrayMove(currentStreaks, oldIndex, newIndex);
 
-        // Trigger mutation
-        const reorderedItems = newItems.map((item, index) => ({
-          id: item.id,
-          position: index,
-        }));
-        reorderMutation.mutate(reorderedItems);
+      // Set optimistic state
+      setOptimisticStreaks(newItems);
 
-        return newItems;
-      });
+      // Trigger mutation
+      const reorderedItems = newItems.map((item, index) => ({
+        id: item.id,
+        position: index,
+      }));
+      reorderMutation.mutate(reorderedItems);
     }
   };
 
@@ -431,11 +437,11 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={optimisticStreaks.map((s) => s.id)}
+          items={displayStreaks.map((s) => s.id)}
           strategy={rectSortingStrategy}
         >
           <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-            {optimisticStreaks.map((streak) => {
+            {displayStreaks.map((streak) => {
               const currentLength = calculateStreakLength(
                 streak.currentStartDate,
                 streak.currentEndDate,
