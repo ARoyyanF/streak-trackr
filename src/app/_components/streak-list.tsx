@@ -88,6 +88,7 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import {
   TooltipTrigger,
   TooltipContent,
@@ -533,7 +534,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                             </CardTitle>
                             {streak.description && (
                               <CardDescription
-                                className="mt-1 text-wrap"
+                                className="mt-1 break-all whitespace-pre-wrap"
                                 style={{ color: subtleTextColor }}
                               >
                                 {streak.description}
@@ -795,7 +796,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input
+                      <Textarea
                         placeholder="e.g., 30 minutes of cardio"
                         {...field}
                       />
