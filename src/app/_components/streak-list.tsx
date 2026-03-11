@@ -616,7 +616,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                             </CardTitle>
                             {streak.description && (
                               <CardDescription
-                                className="mt-1 break-all whitespace-pre-wrap"
+                                className="mt-1 whitespace-pre-wrap"
                                 style={{ color: subtleTextColor }}
                               >
                                 {renderDescriptionWithLinks(streak.description)}
