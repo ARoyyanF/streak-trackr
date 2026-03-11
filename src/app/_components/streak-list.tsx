@@ -1,7 +1,7 @@
 // app/_components/streak-list.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState } from "react";
 import { type RouterOutputs, api } from "~/trpc/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -136,6 +136,88 @@ function adjustColor(hex: string, amount: number): string {
       .toString(16)
       .slice(1)
   );
+}
+
+function normalizeExternalUrl(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `http://${url}`;
+}
+
+function splitTrailingPunctuation(value: string): [string, string] {
+  const regex = /^(.*?)([),.!?;:]+)?$/;
+  const match = regex.exec(value);
+
+  if (!match) {
+    return [value, ""];
+  }
+
+  return [match[1] ?? value, match[2] ?? ""];
+}
+
+function renderDescriptionWithLinks(text: string) {
+  const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+  const parts: Array<
+    | { type: "text"; value: string }
+    | { type: "link"; label: string; href: string }
+  > = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = markdownLinkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: "text", value: text.slice(lastIndex, match.index) });
+    }
+
+    parts.push({
+      type: "link",
+      label: match[1] ?? match[0],
+      href: normalizeExternalUrl(match[2] ?? match[0]),
+    });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: "text", value: text.slice(lastIndex) });
+  }
+
+  return parts.map((part, partIndex) => {
+    if (part.type === "link") {
+      return (
+        <a
+          key={`markdown-link-${partIndex}`}
+          href={part.href}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2"
+        >
+          {part.label}
+        </a>
+      );
+    }
+
+    return part.value.split(/(\s+)/).map((segment, segmentIndex) => {
+      const key = `text-${partIndex}-${segmentIndex}`;
+
+      if (!/^https?:\/\//i.test(segment)) {
+        return <Fragment key={key}>{segment}</Fragment>;
+      }
+
+      const [href, trailingPunctuation] = splitTrailingPunctuation(segment);
+
+      return (
+        <Fragment key={key}>
+          <a
+            href={normalizeExternalUrl(href)}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2"
+          >
+            {href}
+          </a>
+          {trailingPunctuation}
+        </Fragment>
+      );
+    });
+  });
 }
 
 type Streak = RouterOutputs["streak"]["getStreaks"][number];
@@ -537,7 +619,7 @@ export function StreakList({ initialStreaks }: { initialStreaks: Streak[] }) {
                                 className="mt-1 break-all whitespace-pre-wrap"
                                 style={{ color: subtleTextColor }}
                               >
-                                {streak.description}
+                                {renderDescriptionWithLinks(streak.description)}
                               </CardDescription>
                             )}
                           </div>
