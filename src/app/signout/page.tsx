@@ -1,8 +1,7 @@
 import { type Metadata } from "next";
-import { Suspense } from "react";
 import { SignOutForm } from "./signout-form";
 import Link from "next/link";
-import { ArrowLeft, Heart, Trophy, Target } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Sign Out - Streak Trackr",

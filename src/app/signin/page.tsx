@@ -1,7 +1,7 @@
 import { type Metadata } from "next";
 import { SignInForm } from "./signin-form";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, Target, TrendingUp } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Sign In - Streak Trackr",

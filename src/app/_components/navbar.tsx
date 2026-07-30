@@ -69,6 +69,8 @@ export function Navbar({ session }: { session: Session | null }) {
                   {session.user.name}
                 </span>
                 <a href={session.user.image ?? ""}>
+                  {/* OAuth providers supply arbitrary remote hosts. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={session.user.image ?? ""}
                     alt="User avatar"

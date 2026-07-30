@@ -37,6 +37,9 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authConfig = {
+  trustHost:
+    process.env.NODE_ENV === "development" ||
+    process.env.AUTH_TRUST_HOST === "true",
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID,
